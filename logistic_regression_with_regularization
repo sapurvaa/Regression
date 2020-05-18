@@ -1,0 +1,128 @@
+import math
+import pandas as pd
+from sklearn.model_selection import train_test_split
+import numpy as np
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import classification_report
+
+def cost_func(theta, X_train, y_train):
+    z = np.dot(X_train,theta)
+    hyp = np.float64(1. /(1. + pow(math.e,-z)))
+    total = np.sum(-(y_train*(np.log(hyp)))-((1-y_train)*(np.log(1-hyp))))
+    cost = total/len(X_train)
+    return cost
+
+def gradient_descent(theta, X_train, y_train):
+    alpha = 0.001
+    z = np.dot(X_train, theta)
+    hyp = np.float64(1. /(1. + pow(math.e,-z)))
+    total = np.dot(X_train.T,(hyp - y_train))
+    new_theta = theta - ((alpha * total)/len(X_train))
+    return new_theta
+
+def feature_scaling(unscaled_data):
+    data = unscaled_data
+    data[:,:-1] = (unscaled_data[:,:-1] - np.mean(unscaled_data[:,:-1]))/(np.max(unscaled_data[:,:-1])- np.min(unscaled_data[:,:-1]))
+    return data
+
+def cost_regularization(theta,X_train,y_train,lam):
+    z = (np.dot(X_train, theta))
+    hyp = np.float64(1. / (1. + pow(math.e, -z)))
+    lam_sum = sum(np.linalg.norm(theta,1,axis=0))
+    total = np.sum((y_train * (np.log(hyp))) + ((1 - y_train) * (np.log(1 - hyp))))
+    cost = (-total/len(X_train)) + ((lam * lam_sum)/(2*len(X_train)))
+    return cost
+
+def gradient_regularization(theta,X_train,y_train,lam):
+    alpha = 0.1
+    z = np.dot(X_train,theta)
+    hyp = np.float64(1. /(1. + pow(math.e,-z)))
+    total0 = np.dot(X_train[:,0].T, (hyp - y_train))
+    total = np.dot(X_train[:,1:].T, (hyp - y_train))
+    new_theta0 = theta[0,:] - ((alpha * total0)/len(X_train))
+    new_theta_rest = theta[1:,:] - alpha * ((total/len(X_train))+(lam * theta[1:,:])/len(X_train))
+    new_theta = np.empty(theta.shape)
+    new_theta[0,:] = new_theta0
+    new_theta[1:,:] = new_theta_rest
+    return new_theta
+
+if __name__ == '__main__':
+    complete_data = pd.read_csv("BSOM_DataSet_for_HW2.csv", usecols=("all_mcqs_avg_n20", "all_NBME_avg_n4", "LEVEL"))
+    #print(complete_data)
+    features = complete_data.shape[1]
+    #print("number of features is " + str(features))
+
+    unscaled_data = complete_data.to_numpy()
+    #print(unscaled_data)
+    temp_data = feature_scaling(unscaled_data)
+    #print("scaled data " + str(temp_data))
+    data = np.append(np.ones([len(temp_data), 1]), temp_data, 1)
+    #print("final data " + str(data))
+
+    X = data[:, :-1]
+    y = data[:,features]
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=27)
+    y_train = y_train[:,None]
+    y_test = y_test[:,None]
+
+    labels = ["A","B","C","D"]
+    y_master_train = y_train
+    lambda_values = [0.1,1.0,11.0,31.0,100.0]
+    theta_lam = []
+    for lam in lambda_values:
+        final_theta = []
+        for label in labels:
+            num_iterations = 1
+            #print("Label " + label)
+            for i in range(len(y_master_train)):
+                if y_master_train[i] == label:
+                    y_train[i,0] = 1
+                else:
+                    y_train[i,0] = 0
+            theta = np.random.rand(features, 1)
+            #print("initial theta values " + str(theta))
+            #cost = cost_func(theta, X_train, y_train)
+            cost = cost_regularization(theta,X_train,y_train,lam)
+            #print("initial cost " + str(cost))
+            while(num_iterations < 600):
+                #new_theta = gradient_descent(theta, X_train, y_train)
+                new_theta = gradient_regularization(theta,X_train,y_train,lam)
+                #print("new theta values " + str(new_theta))
+                #new_cost = cost_func(theta, X_train, y_train)
+                new_cost = cost_regularization(new_theta, X_train, y_train, lam)
+                #print("new cost " + str(new_cost))
+                theta = new_theta
+                cost = new_cost
+                num_iterations = num_iterations + 1
+            #print("final theta val for label " + label + " " + str(theta))
+            final_theta.append(theta.T.flatten().tolist())
+        theta_labels = np.array(final_theta)
+        #print("Final theta values for all labels")
+        #print(theta_labels)
+        theta_lam.append(theta_labels)
+    theta_lam_final = np.array(theta_lam)
+    #print(np.array(theta_lam))
+
+    print("predicted values for different lambda values")
+    hypothesis_lam = []
+    for each_val in theta_lam_final:
+        z = np.dot(X_test,each_val.T)
+        hyp = np.float64(1. / (1. + pow(math.e, -z)))
+        hypothesis_table = np.argmax(hyp,axis =1)
+        print(hypothesis_table)
+        hypothesis_lam.append(hypothesis_table)
+
+    y_master_test = y_test
+    for i in range(len(y_master_test)):
+        y_test[i] = labels.index(y_master_test[i])
+
+    actual = np.array(y_test.T.flatten().tolist())
+    print("actual values", actual)
+
+    for each_lam in hypothesis_lam:
+        results = confusion_matrix(actual, each_lam)
+        print("confusion matrix" + str(results))
+        accuracy = accuracy_score(actual, each_lam)
+        print(accuracy)
+        print(classification_report(actual, each_lam,target_names=['A','B','C','D']))
