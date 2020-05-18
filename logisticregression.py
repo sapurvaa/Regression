@@ -79,27 +79,17 @@ if __name__ == '__main__':
     z = np.dot(X_test,theta_labels.T)
     hyp = np.float64(1. / (1. + pow(math.e, -z)))
     hypothesis_table = np.argmax(hyp,axis =1)
-    print(hypothesis_table)
+   print("predicted values" ,hypothesis_table)
 
     y_master_test = y_test
     for i in range(len(y_master_test)):
         y_test[i] = labels.index(y_master_test[i])
 
-    for l in range(len(labels)):
-        actual = []
-        predicted = []
-        for i in range(len(hypothesis_table)):
-            if hypothesis_table[i] == l:
-                predicted.append(1)
-            else:
-                predicted.append(0)
-            if y_test[i] == l:
-                actual.append(1)
-            else:
-                actual.append(0)
+    actual = np.array(y_test.T.flatten().tolist())
+    print("actual values" ,actual)
 
-        results = confusion_matrix(actual, predicted)
-        print("confusion matrix" + str(results))
-        accuracy = accuracy_score(actual, predicted)
-        print(accuracy)
-        print(classification_report(actual, predicted))
+    results = confusion_matrix(actual, hypothesis_table)
+    print("confusion matrix" + str(results))
+    accuracy = accuracy_score(actual, hypothesis_table)
+    print(accuracy)
+    print(classification_report(actual, hypothesis_table, target_names=['A', 'B', 'C', 'D']))
